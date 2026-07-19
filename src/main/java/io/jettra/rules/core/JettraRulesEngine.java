@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.regex.Pattern;
+import io.jettra.rules.validations.Min;
+import io.jettra.rules.validations.NotNull;
 
 public class JettraRulesEngine {
 
@@ -28,6 +30,22 @@ public class JettraRulesEngine {
             if (field.isAnnotationPresent(Rules.class)) {
                 Rules rule = field.getAnnotation(Rules.class);
                 results.add(validateField(obj, field, rule, messages));
+            }
+            if (field.isAnnotationPresent(Min.class)) {
+                Min min = field.getAnnotation(Min.class);
+                field.setAccessible(true);
+                try {
+                    Object value = field.get(obj);
+                    if (value instanceof Number n) {
+                        if (n.doubleValue() < min.value()) {
+                            String message = min.message().replace("{value}", String.valueOf(min.value()));
+                            if (messages != null && messages.containsKey(message)) {
+                                message = messages.getProperty(message);
+                            }
+                            results.add(new RuleResult(false, message, field.getName()));
+                        }
+                    }
+                } catch (Exception e) {}
             }
         }
         return results;
