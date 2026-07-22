@@ -27,28 +27,108 @@ public class JettraRulesEngine {
 
         Class<?> clazz = obj.getClass();
         for (Field field : clazz.getDeclaredFields()) {
+            field.setAccessible(true);
+            String label = getFieldLabel(field, messages);
+            Object value = null;
+            try {
+                value = field.get(obj);
+            } catch (Exception e) {}
+
+            // 1. @Rules
             if (field.isAnnotationPresent(Rules.class)) {
                 Rules rule = field.getAnnotation(Rules.class);
                 results.add(validateField(obj, field, rule, messages));
             }
+
+            // 2. @NotNull
+            if (field.isAnnotationPresent(NotNull.class)) {
+                NotNull notNullAnno = field.getAnnotation(NotNull.class);
+                boolean invalid = (value == null);
+                if (!invalid && value instanceof String s) {
+                    invalid = s.trim().isEmpty();
+                }
+                if (invalid) {
+                    String msg = notNullAnno.message();
+                    if (msg == null || msg.isEmpty() || msg.startsWith("{")) {
+                        msg = "El campo '" + label + "' no puede estar vacío";
+                    } else if (messages != null && messages.containsKey(msg)) {
+                        msg = messages.getProperty(msg);
+                    }
+                    results.add(new RuleResult(false, msg, field.getName()));
+                }
+            }
+
+            // 3. @Min
             if (field.isAnnotationPresent(Min.class)) {
                 Min min = field.getAnnotation(Min.class);
-                field.setAccessible(true);
-                try {
-                    Object value = field.get(obj);
-                    if (value instanceof Number n) {
-                        if (n.doubleValue() < min.value()) {
-                            String message = min.message().replace("{value}", String.valueOf(min.value()));
-                            if (messages != null && messages.containsKey(message)) {
-                                message = messages.getProperty(message);
-                            }
-                            results.add(new RuleResult(false, message, field.getName()));
+                if (value instanceof Number n) {
+                    if (n.doubleValue() < min.value()) {
+                        String msg = min.message();
+                        if (msg == null || msg.isEmpty() || msg.contains("{value}") || msg.startsWith("{")) {
+                            long minVal = min.value();
+                            msg = "El campo '" + label + "' debe ser mayor o igual a " + minVal;
+                        } else if (messages != null && messages.containsKey(msg)) {
+                            msg = messages.getProperty(msg);
                         }
+                        results.add(new RuleResult(false, msg, field.getName()));
                     }
-                } catch (Exception e) {}
+                }
+            }
+
+            // 4. @Max
+            if (field.isAnnotationPresent(io.jettra.rules.validations.Max.class)) {
+                io.jettra.rules.validations.Max max = field.getAnnotation(io.jettra.rules.validations.Max.class);
+                if (value instanceof Number n) {
+                    if (n.doubleValue() > max.value()) {
+                        String msg = max.message();
+                        if (msg == null || msg.isEmpty() || msg.contains("{value}") || msg.startsWith("{")) {
+                            msg = "El campo '" + label + "' debe ser menor o igual a " + max.value();
+                        } else if (messages != null && messages.containsKey(msg)) {
+                            msg = messages.getProperty(msg);
+                        }
+                        results.add(new RuleResult(false, msg, field.getName()));
+                    }
+                }
+            }
+
+            // 5. @Size
+            if (field.isAnnotationPresent(io.jettra.rules.validations.Size.class)) {
+                io.jettra.rules.validations.Size size = field.getAnnotation(io.jettra.rules.validations.Size.class);
+                if (value instanceof String s) {
+                    if (s.length() < size.min() || s.length() > size.max()) {
+                        String msg = "El campo '" + label + "' debe tener entre " + size.min() + " y " + size.max() + " caracteres";
+                        results.add(new RuleResult(false, msg, field.getName()));
+                    }
+                }
             }
         }
         return results;
+    }
+
+    private static String getFieldLabel(Field field, Properties messages) {
+        String label = null;
+        for (java.lang.annotation.Annotation ann : field.getAnnotations()) {
+            if (ann.annotationType().getSimpleName().equals("PropertiesLabel")) {
+                try {
+                    String propKey = (String) ann.annotationType().getMethod("value").invoke(ann);
+                    if (messages != null && propKey != null && messages.containsKey(propKey)) {
+                        label = messages.getProperty(propKey);
+                    }
+                    if (label == null || label.trim().isEmpty()) {
+                        label = (String) ann.annotationType().getMethod("label").invoke(ann);
+                    }
+                } catch (Exception e) {}
+                break;
+            }
+        }
+        if (label == null || label.trim().isEmpty()) {
+            if (messages != null && messages.containsKey(field.getName())) {
+                label = messages.getProperty(field.getName());
+            } else {
+                label = field.getName();
+            }
+        }
+        return label;
     }
 
     private static RuleResult validateField(Object obj, Field field, Rules rule, Properties messages) {
