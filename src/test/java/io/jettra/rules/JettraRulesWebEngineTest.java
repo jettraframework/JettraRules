@@ -7,8 +7,10 @@ import io.jettra.rules.core.JettraRulesEngine;
 import io.jettra.rules.core.JettraRulesWebEngine;
 import io.jettra.rules.core.RuleResult;
 import io.jettra.rules.enums.OperationType;
+import io.jettra.rules.validations.Email;
 import io.jettra.rules.validations.Min;
 import io.jettra.rules.validations.NotNull;
+import io.jettra.rules.validations.Size;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -29,6 +31,13 @@ public class JettraRulesWebEngineTest {
 
         @Compute(operation = OperationType.SUBTRACTION, fields = {"saldo", "descuento"})
         private Double saldoNeto;
+
+        @NotNull
+        @Email
+        private String email = "test@example.com";
+
+        @Min(0)
+        private Integer edad = 25;
 
         public TestModel() {}
         public TestModel(Double saldo, Double descuento) {
@@ -59,6 +68,7 @@ public class JettraRulesWebEngineTest {
         assertTrue(script.contains("function validateModelRules"));
         assertTrue(script.contains("function compute_saldoNeto"));
         assertTrue(script.contains("El descuento no puede superar el saldo"));
+        assertTrue(script.contains("correo electrónico válido"));
         assertTrue(script.contains("showToast"));
     }
 
@@ -68,3 +78,4 @@ public class JettraRulesWebEngineTest {
         assertEquals("true", attrs.get("required"));
     }
 }
+
