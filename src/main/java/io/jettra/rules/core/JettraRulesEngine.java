@@ -40,55 +40,65 @@ public class JettraRulesEngine {
                 results.add(validateField(obj, field, rule, messages));
             }
 
-            // 2. @NotNull
-            if (field.isAnnotationPresent(NotNull.class)) {
-                NotNull notNullAnno = field.getAnnotation(NotNull.class);
+            // 2. @NotNull / @NotBlank / @NotEmpty
+            if (field.isAnnotationPresent(NotNull.class) ||
+                field.isAnnotationPresent(io.jettra.rules.validations.NotBlank.class) ||
+                field.isAnnotationPresent(io.jettra.rules.validations.NotEmpty.class)) {
                 boolean invalid = (value == null);
                 if (!invalid && value instanceof String s) {
                     invalid = s.trim().isEmpty();
                 }
                 if (invalid) {
-                    String msg = notNullAnno.message();
-                    if (msg == null || msg.isEmpty() || msg.startsWith("{")) {
-                        msg = "El campo '" + label + "' no puede estar vacío";
-                    } else if (messages != null && messages.containsKey(msg)) {
+                    String msg = "El campo '" + label + "' no puede estar vacío";
+                    if (field.isAnnotationPresent(NotNull.class)) {
+                        String customMsg = field.getAnnotation(NotNull.class).message();
+                        if (customMsg != null && !customMsg.isEmpty() && !customMsg.startsWith("{")) msg = customMsg;
+                    }
+                    if (messages != null && messages.containsKey(msg)) {
                         msg = messages.getProperty(msg);
                     }
                     results.add(new RuleResult(false, msg, field.getName()));
                 }
             }
 
-            // 3. @Min
+            // 3. @Min / @DecimalMin
             if (field.isAnnotationPresent(Min.class)) {
                 Min min = field.getAnnotation(Min.class);
                 if (value instanceof Number n) {
                     if (n.doubleValue() < min.value()) {
-                        String msg = min.message();
-                        if (msg == null || msg.isEmpty() || msg.contains("{value}") || msg.startsWith("{")) {
-                            long minVal = min.value();
-                            msg = "El campo '" + label + "' debe ser mayor o igual a " + minVal;
-                        } else if (messages != null && messages.containsKey(msg)) {
-                            msg = messages.getProperty(msg);
-                        }
+                        String msg = "El campo '" + label + "' debe ser mayor o igual a " + min.value();
                         results.add(new RuleResult(false, msg, field.getName()));
                     }
                 }
             }
+            if (field.isAnnotationPresent(io.jettra.rules.validations.DecimalMin.class)) {
+                io.jettra.rules.validations.DecimalMin decMin = field.getAnnotation(io.jettra.rules.validations.DecimalMin.class);
+                try {
+                    double minVal = Double.parseDouble(decMin.value());
+                    if (value instanceof Number n && n.doubleValue() < minVal) {
+                        results.add(new RuleResult(false, "El campo '" + label + "' debe ser mayor o igual a " + minVal, field.getName()));
+                    }
+                } catch (Exception e) {}
+            }
 
-            // 4. @Max
+            // 4. @Max / @DecimalMax
             if (field.isAnnotationPresent(io.jettra.rules.validations.Max.class)) {
                 io.jettra.rules.validations.Max max = field.getAnnotation(io.jettra.rules.validations.Max.class);
                 if (value instanceof Number n) {
                     if (n.doubleValue() > max.value()) {
-                        String msg = max.message();
-                        if (msg == null || msg.isEmpty() || msg.contains("{value}") || msg.startsWith("{")) {
-                            msg = "El campo '" + label + "' debe ser menor o igual a " + max.value();
-                        } else if (messages != null && messages.containsKey(msg)) {
-                            msg = messages.getProperty(msg);
-                        }
+                        String msg = "El campo '" + label + "' debe ser menor o igual a " + max.value();
                         results.add(new RuleResult(false, msg, field.getName()));
                     }
                 }
+            }
+            if (field.isAnnotationPresent(io.jettra.rules.validations.DecimalMax.class)) {
+                io.jettra.rules.validations.DecimalMax decMax = field.getAnnotation(io.jettra.rules.validations.DecimalMax.class);
+                try {
+                    double maxVal = Double.parseDouble(decMax.value());
+                    if (value instanceof Number n && n.doubleValue() > maxVal) {
+                        results.add(new RuleResult(false, "El campo '" + label + "' debe ser menor o igual a " + maxVal, field.getName()));
+                    }
+                } catch (Exception e) {}
             }
 
             // 5. @Size
@@ -101,8 +111,54 @@ public class JettraRulesEngine {
                     }
                 }
             }
+
+            // 6. @Pattern
+            if (field.isAnnotationPresent(io.jettra.rules.validations.Pattern.class)) {
+                io.jettra.rules.validations.Pattern pat = field.getAnnotation(io.jettra.rules.validations.Pattern.class);
+                if (value != null && !Pattern.compile(pat.regexp()).matcher(value.toString()).matches()) {
+                    results.add(new RuleResult(false, "El campo '" + label + "' no cumple con el formato requerido", field.getName()));
+                }
+            }
+
+            // 7. @Email
+            if (field.isAnnotationPresent(io.jettra.rules.validations.Email.class)) {
+                if (value != null && !Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$").matcher(value.toString()).matches()) {
+                    results.add(new RuleResult(false, "El campo '" + label + "' debe ser un correo electrónico válido", field.getName()));
+                }
+            }
+
+            // 8. @Positive / @PositiveOrZero
+            if (field.isAnnotationPresent(io.jettra.rules.validations.Positive.class)) {
+                if (value instanceof Number n && n.doubleValue() <= 0) {
+                    results.add(new RuleResult(false, "El campo '" + label + "' debe ser un número positivo", field.getName()));
+                }
+            }
+            if (field.isAnnotationPresent(io.jettra.rules.validations.PositiveOrZero.class)) {
+                if (value instanceof Number n && n.doubleValue() < 0) {
+                    results.add(new RuleResult(false, "El campo '" + label + "' debe ser mayor o igual a cero", field.getName()));
+                }
+            }
+
+            // 9. @Negative / @NegativeOrZero
+            if (field.isAnnotationPresent(io.jettra.rules.validations.Negative.class)) {
+                if (value instanceof Number n && n.doubleValue() >= 0) {
+                    results.add(new RuleResult(false, "El campo '" + label + "' debe ser un número negativo", field.getName()));
+                }
+            }
+            if (field.isAnnotationPresent(io.jettra.rules.validations.NegativeOrZero.class)) {
+                if (value instanceof Number n && n.doubleValue() > 0) {
+                    results.add(new RuleResult(false, "El campo '" + label + "' debe ser menor o igual a cero", field.getName()));
+                }
+            }
         }
         return results;
+    }
+
+    /**
+     * Delegates web rules script generation for client-side validation and computation.
+     */
+    public static String generateWebRulesScript(Class<?> modelClass, String formId, String inputPrefix, String inputSuffix, String toastFunctionName) {
+        return JettraRulesWebEngine.generateFullWebRulesScript(modelClass, formId, inputPrefix, inputSuffix, toastFunctionName);
     }
 
     private static String getFieldLabel(Field field, Properties messages) {

@@ -83,6 +83,25 @@ public class JettraComputeEngine {
                     }
                 }
                 break;
+            case AVERAGE:
+                if (vals.length > 0) {
+                    double sum = 0;
+                    for (double v : vals) sum += v;
+                    result = sum / vals.length;
+                }
+                break;
+            case ABS:
+                if (vals.length > 0) result = Math.abs(vals[0]);
+                break;
+            case ROUND:
+                if (vals.length > 0) result = Math.round(vals[0]);
+                break;
+            case CEIL:
+                if (vals.length > 0) result = Math.ceil(vals[0]);
+                break;
+            case FLOOR:
+                if (vals.length > 0) result = Math.floor(vals[0]);
+                break;
             case PERCENTAGE:
                 if (vals.length >= 2) result = (vals[0] * vals[1]) / 100.0;
                 break;
