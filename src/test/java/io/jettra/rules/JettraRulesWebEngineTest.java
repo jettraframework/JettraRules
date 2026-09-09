@@ -11,13 +11,15 @@ import io.jettra.rules.validations.Email;
 import io.jettra.rules.validations.Min;
 import io.jettra.rules.validations.NotNull;
 import io.jettra.rules.validations.Size;
-import org.junit.jupiter.api.Test;
+import io.jettra.test.annotation.NotRequiresRunningServer;
+import io.jettra.test.annotation.Test;
 
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static io.jettra.test.core.JettraAssert.*;
 
+@NotRequiresRunningServer
 public class JettraRulesWebEngineTest {
 
     public static class TestModel {
